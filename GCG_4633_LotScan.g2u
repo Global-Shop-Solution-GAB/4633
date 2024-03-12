@@ -1,0 +1,117 @@
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+V.Local.sError.Declare(String)
+
+'Coded by:WAW
+'Date: 7/12/2017
+'This project will auto fill in the Heat and serial numbers when using the Issue material by Lot screen.
+
+'open connection
+F.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+
+'This sub will check if the user scans a lot and populates the appropriate fileds
+
+f.Intrinsic.Control.CallSub(scan)
+
+F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4633_LotScan.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.Main.End
+
+Program.Sub.Unload.Start
+
+F.Intrinsic.Control.SetErrorHandler("Unload_Err")
+F.Intrinsic.Control.ClearErrors
+V.Local.sError.Declare(String)
+
+'closing connection and ending program
+F.ODBC.Connection!conx.Close
+Function.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.Label("Unload_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4633_LotScan.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.End
+
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.Unload.End
+
+Program.Sub.Scan.Start
+F.Intrinsic.Control.SetErrorHandler("Scan_Err")
+F.Intrinsic.Control.ClearErrors
+v.Local..BulkDeclareString(sError,sLot,sBin,sSerial,sQty,sSql,sPart,sRev)
+
+'check to see if the scan hook has fired
+f.Intrinsic.Control.SelectCase(v.Caller.Hook)
+	'combine the part and rev
+'	f.Intrinsic.String.GSSPartString(v.Passed.000007,v.Passed.000026,v.Local.spart)
+	'if the hook fires when a lot is scanned populate the appropriate fields
+	f.Intrinsic.Control.Case(28834)
+	
+	f.Intrinsic.String.GSSPartString(v.Passed.000007,v.Passed.000026,v.Local.spart)
+	
+	'check to see if the part is blank
+	f.Intrinsic.Control.If(v.Local.spart.Trim,=,"")
+		f.Intrinsic.String.Build("Select PART, BIN, HEAT, SERIAL_NUMBER, QUANTITY, QTY_AVAILABLE_SHIP from V_ITEM_MASTER where LOT = '{0}'",v.Passed.000006,v.Local.ssql)
+		'query for the Bin, Heat, Serial and Quantity informmation
+		f.ODBC.Connection!Conx.OpenLocalRecordsetRO("rst",v.Local.sSQL)
+		f.Intrinsic.Control.If(v.ODBC.Conx!rst.EOF,=,False)
+			'Set override to prevent CORE from attempting to bring in min(quantity in lot record, wo estimated requirement)
+			V.Passed.777777.Set(1)
+			
+			'set the fields on the screen
+			v.Passed.000011.Set(v.ODBC.conx!rst.FieldValTrim!BIN)
+			v.Passed.000013.Set(v.ODBC.conx!rst.FieldValTrim!HEAT)
+			v.Passed.000015.Set(v.ODBC.conx!rst.FieldValTrim!SERIAL_NUMBER)
+			v.Passed.000017.Set(v.ODBC.conx!rst.FieldValTrim!QUANTITY)
+			v.Passed.000019.Set(v.ODBC.conx!rst.FieldValTrim!QTY_AVAILABLE_SHIP)
+			f.Intrinsic.String.Left(v.ODBC.conx!rst.FieldValTrim!PART,17,v.Local.spart)
+			f.Intrinsic.String.Right(v.ODBC.conx!rst.FieldValTrim!PART,3,v.Local.srev)
+			f.Intrinsic.String.GSSPartString(v.Local.spart,v.Local.srev,v.Local.spart)
+			v.Passed.000007.Set(v.Local.spart)	
+		f.Intrinsic.Control.EndIf	
+	f.Intrinsic.Control.Else
+		f.Intrinsic.String.Build("Select BIN, HEAT, SERIAL_NUMBER, QUANTITY, QTY_AVAILABLE_SHIP from V_ITEM_MASTER where PART = '{0}' and LOT = '{1}'",v.Local.spart.Trim,v.Passed.000006,v.Local.ssql)
+		'query for the Bin, Heat, Serial and Quantity informmation
+		f.ODBC.Connection!Conx.OpenLocalRecordsetRO("rst",v.Local.sSQL)
+		f.Intrinsic.Control.If(v.ODBC.Conx!rst.EOF,=,False)
+			'Set override to prevent CORE from attempting to bring in min(quantity in lot record, wo estimated requirement)
+			V.Passed.777777.Set(1)
+			
+			'set the fields on the screen
+			v.Passed.000011.Set(v.ODBC.conx!rst.FieldValTrim!BIN)
+			v.Passed.000013.Set(v.ODBC.conx!rst.FieldValTrim!HEAT)
+			v.Passed.000015.Set(v.ODBC.conx!rst.FieldValTrim!SERIAL_NUMBER)
+			v.Passed.000017.Set(v.ODBC.conx!rst.FieldValTrim!QUANTITY)
+			v.Passed.000019.Set(v.ODBC.conx!rst.FieldValTrim!QTY_AVAILABLE_SHIP)
+		f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.EndIf
+	f.ODBC.Conx!rst.Close
+f.Intrinsic.Control.EndSelect
+
+f.Intrinsic.Control.CallSub(unload)
+
+F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.Label("Scan_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4633_LotScan.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.CallSub(unload)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Scan.End
+
+Program.Sub.Comments.Start
+${$0$}$$}$$}$12:00:00 AM$}$False
+Program.Sub.Comments.End
